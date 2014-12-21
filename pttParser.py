@@ -43,6 +43,8 @@ def _extractReference(referenceSpans):          ## return dict and a set for che
 	referenceSet = set()
 	referenceText = ""
 	skipCharacter = 2
+	user = None
+
 	citationTag = "※ 引述《"
 	for referenceSpan in referenceSpans:
 		line = referenceSpan.text
@@ -50,11 +52,14 @@ def _extractReference(referenceSpans):          ## return dict and a set for che
 			authorExtractor = re.compile("《.*》")
 			pttID,nickname = authorExtractor.findall(line)[0].strip("《》()").split(" ")
 			user = {"id": pttID, "nickname": nickname}
-		elif:
+		else:
 			originalLine = line[skipCharacter:]
 			referenceSet.add(line)
 			referenceText += (originalLine + "\n") 
-	return ({"user": user, "body": referenceText}, referenceSet)
+	if user == None:
+		return ({"body": referenceText}, referenceSet)
+	else:
+		return ({"user": user, "body": referenceText}, referenceSet)
 
 
 
@@ -73,11 +78,11 @@ def _parseText(soup):
 	textEnding = "※ 發信站: 批踢踢實業坊(ptt.cc)"
 	referenceSpans = soup.find_all("span", {"class": "f6"})
 
-	if referenceSpan != []:
+	if referenceSpans != []:
 		reference, referenceSet = _extractReference(referenceSpans)
 		finalDict["reference"] = reference
 		checkReference = True
-	elif:
+	else:
 		referenceSet = set()
 		checkReference = False
 	
@@ -99,7 +104,7 @@ def _parseText(soup):
 	if sign == None:
 		textOverHead = 2
 	else:
-		textOverHead = 
+		textOverHead = 4 + len(sign)
 	finalDict["body"] = textBody[:-textOverHead]		
 	
 	return finalDict 
@@ -136,10 +141,22 @@ def _getTime(spans):
 
 
 def _getIP(spans):
-	ipExtractor = re.compile('[\d]+\.[\d]+\.[\d]+\.[\d]+')
-	ip = ipExtractor.findall(spans[9].text)[0]
+	ipText = None
+	for span in spans:
+		if span.text == "※ 發信站: 批踢踢實業坊(ptt.cc)\n":
+			ipText = span.next_sibling
+			
+	if ipText == None:
+		ip = None
+	else:
+		ipExtractor = re.compile('[\d]+\.[\d]+\.[\d]+\.[\d]+')
+		ip = ipExtractor.findall(ipText)[0]
+
 	return ip
 
-print(ptt2Dict(open("M.1341991719.A.E7B.txt")))
-
+#print(ptt2Dict(open("M.1341991719.A.E7B.txt")))
+print(ptt2Dict(open("sample.html")))
+print(ptt2Dict(open("sample2.html")))
+print(ptt2Dict(open("sample3.html")))
+print(ptt2Dict(open("sample4.html")))
 
