@@ -4,6 +4,7 @@ import time
 from time import mktime 
 from datetime import datetime
 
+
 def ptt2Dict(pttString):
 	soup = BeautifulSoup(pttString)
 	pttDict = {}
@@ -15,11 +16,19 @@ def ptt2Dict(pttString):
 	pttDict["created_at"] = _getTime(spans)
 	pttDict["ip"] = _getIP(spans)
 	pttDict["text"] = _parseText(soup)
-	postYear = str(pttDict["created_at"].year)              ## Push data date does not contain year. Year is added in here
+	postYear = _getYear(pttDict["created_at"])            ## Push data date does not contain year. Year is added in here
+	#print(postYear)
 	pttDict["push"] = _getPush(pushDivs, postYear)
 
 	return pttDict
 
+
+
+def _getYear(created_at):
+	if created_at == None:
+		return None
+	else:
+		return str(created_at.year)
 
 
 def _getPush(pushDivs, postYear):
@@ -34,7 +43,10 @@ def _extractPush(spans, postYear):
 	pushTag = spans[0].text
 	pushUserID = spans[1].text
 	pushContent = spans[2].text[1:]
-	pushTime = datetime.strptime(spans[3].text + postYear, " %m/%d %H:%M\n%Y")  
+	if postYear == None:
+		pushTime = None
+	else:
+		pushTime = datetime.strptime(spans[3].text + postYear, " %m/%d %H:%M\n%Y")  
 	return {"push_tag": pushTag, "push_user_id": pushUserID, "push_content": pushContent, "pushTime": pushTime}
 
 
@@ -44,14 +56,21 @@ def _extractReference(referenceSpans):          ## return dict and a set for che
 	referenceText = ""
 	skipCharacter = 2
 	user = None
-
+	replaceString = "《》()"
 	citationTag = "※ 引述《"
 	for referenceSpan in referenceSpans:
 		line = referenceSpan.text
 		if citationTag in line:
 			authorExtractor = re.compile("《.*》")
-			pttID,nickname = authorExtractor.findall(line)[0].strip("《》()").split(" ")
+			line = authorExtractor.findall(line)[0]
+		
+			#print(authorExtractor.findall(line)[0].replace("《》()","").split(" "))
+			for char in replaceString:
+				line = line.replace(char, "")
+			#print(line.split(" "))
+			pttID,nickname = line.split(" ")[0:2]
 			user = {"id": pttID, "nickname": nickname}
+
 		else:
 			originalLine = line[skipCharacter:]
 			referenceSet.add(line)
@@ -111,13 +130,36 @@ def _parseText(soup):
 
 
 def _getUser(spans):
-	pttID, nickname = spans[1].text.split()
-	nickname = nickname.strip("()")
-	return {"id": pttID, "nickname": nickname}
+	userSpan = None
+	for span in spans:
+		if span.text == "作者":
+			userSpan = span.nextSibling
+			break
+	if userSpan == None:
+		user = None
+	else:
+
+		pttID = userSpan.text.split()[0]
+		nicknameExtractor = re.compile("\((.*)\)")
+		nickname = nicknameExtractor.findall(userSpan.text)[0]
+		user = {"id": pttID, "nickname": nickname}
+	#print(pttID,nickname)
+	return user
 
 
 def _getBorad(spans):
-	board = spans[3].text
+	boardSpan = None
+	for span in spans:
+		if span.text == "看板":
+			boardSpan = span.nextSibling
+			break
+	
+	if boardSpan == None:
+		board = None
+	else:
+		board = boardSpan.text
+
+	
 	return board
 
 def _getTitle(spans):
@@ -136,27 +178,31 @@ def _getTitle(spans):
 		return {"body":topic}
 
 def _getTime(spans):
-	created_at = datetime.strptime(spans[7].text, "%a %b %d %H:%M:%S %Y")
-	return created_at
+	timeSpan = None
+	for span in spans:
+		if span.text == "時間":
+			timeSpan = span.nextSibling
+			break
+	if timeSpan == None:
+		return None
+	else:
+		created_at = datetime.strptime(timeSpan.text, "%a %b %d %H:%M:%S %Y")
+		return created_at
 
 
 def _getIP(spans):
 	ipText = None
 	for span in spans:
-		if span.text == "※ 發信站: 批踢踢實業坊(ptt.cc)\n":
-			ipText = span.next_sibling
+		if span.text == "◆ From: ":
+			ipText = span.text
 			
 	if ipText == None:
 		ip = None
 	else:
 		ipExtractor = re.compile('[\d]+\.[\d]+\.[\d]+\.[\d]+')
+		#print(ipText)
 		ip = ipExtractor.findall(ipText)[0]
 
 	return ip
 
-#print(ptt2Dict(open("M.1341991719.A.E7B.txt")))
-print(ptt2Dict(open("sample.html")))
-print(ptt2Dict(open("sample2.html")))
-print(ptt2Dict(open("sample3.html")))
-print(ptt2Dict(open("sample4.html")))
 
